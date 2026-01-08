@@ -1,3 +1,8 @@
+-- Initialize Config if it doesn't exist (Saved Variable)
+if not GatherLevelsConfig then
+    GatherLevelsConfig = { showLeftText = true }
+end
+
 MINING_NODE_LEVEL = {
     ["Copper Vein"] = 1, ["Tin Vein"] = 65, ["Incendicite"] = 65,
     ["Silver Vein"] = 75, ["Iron Deposit"] = 125, ["Indurium Deposit"] = 150,
@@ -21,7 +26,6 @@ HERBALISM_NODE_LEVEL = {
     ["Black Lotus"] = 300
 }
 
--- Lockboxes usually found in inventory (since they don't show skill req until clicked)
 LOCKBOX_LEVEL = {
     ["Ornate Bronze Lockbox"] = 1, ["Heavy Bronze Lockbox"] = 25,
     ["Iron Lockbox"] = 70, ["Strong Iron Lockbox"] = 125,
@@ -31,12 +35,56 @@ LOCKBOX_LEVEL = {
     ["Sturdy Junkbox"] = 175, ["Heavy Junkbox"] = 250
 }
 
+-- Centralized logic for difficulty colors and toggleable status
 function GatherLevels_GetDifficultyInfo(playerSkill, reqSkill)
-    if playerSkill < reqSkill then return 1.00, 0.13, 0.13, "Too Low" end
-    if playerSkill >= (reqSkill + 100) then return 0.50, 0.50, 0.50, "Gray" end
-    if playerSkill >= (reqSkill + 50) then return 0.25, 0.75, 0.25, ((reqSkill + 100) - playerSkill) .. " to Gray" end
-    if playerSkill >= (reqSkill + 25) then return 1.00, 1.00, 0.00, ((reqSkill + 50) - playerSkill) .. " to Green" end
-    return 1.00, 0.50, 0.25, ((reqSkill + 25) - playerSkill) .. " to Yellow"
+    local r, g, b, status;
+    local showExtra = GatherLevelsConfig.showLeftText
+
+    -- Hex Codes for text coloring
+    local cGray   = "|cff808080Gray|r"
+    local cGreen  = "|cff40bf40Green|r"
+    local cYellow = "|cffffff00Yellow|r"
+    local cOrange = "|cffff8040Orange|r"
+    local cRed    = "|cffff2121Too Low|r"
+
+    if playerSkill < reqSkill then
+        return 1.00, 0.13, 0.13, cRed
+    elseif playerSkill >= (reqSkill + 100) then
+        return 0.50, 0.50, 0.50, cGray
+    elseif playerSkill >= (reqSkill + 50) then
+        status = showExtra and (((reqSkill + 100) - playerSkill) .. " to " .. cGray) or cGreen
+        return 0.25, 0.75, 0.25, status
+    elseif playerSkill >= (reqSkill + 25) then
+        status = showExtra and (((reqSkill + 50) - playerSkill) .. " to " .. cGreen) or cYellow
+        return 1.00, 1.00, 0.00, status
+    else
+        status = showExtra and (((reqSkill + 25) - playerSkill) .. " to " .. cYellow) or cOrange
+        return 1.00, 0.50, 0.25, status
+    end
+end
+
+-- Slash Command Handler
+SLASH_GATHERLEVELS1 = "/gl"
+SlashCmdList["GATHERLEVELS"] = function(msg)
+    if msg == "left" then
+        GatherLevelsConfig.showLeftText = not GatherLevelsConfig.showLeftText
+        local state = GatherLevelsConfig.showLeftText and "|cff00ff00Enabled|r" or "|cffff0000Disabled|r"
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00GatherLevels:|r Skill points remaining text is now " .. state .. ".")
+    elseif msg == "skills" or msg == "" then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00GatherLevels Profession Summary:|r")
+        local skills = {"Mining", "Herbalism", "Skinning", "Lockpicking"}
+        for _, s in pairs(skills) do
+            local rank = GatherLevels_GetProfessionLevel(s)
+            if rank > 0 then
+                DEFAULT_CHAT_FRAME:AddMessage(" - " .. s .. ": |cff00ff00" .. rank .. "|r")
+            end
+        end
+        DEFAULT_CHAT_FRAME:AddMessage(" - Type |cFF00FF00/gl left|r to toggle threshold text.")
+    else
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00GatherLevels Commands:|r")
+        DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl skills|r : Shows your current gathering levels.")
+        DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl left|r : Toggles 'points until next color' text.")
+    end
 end
 
 function GatherLevels_GetProfessionLevel(skill)
@@ -53,25 +101,20 @@ function GatherLevels_OnShow()
     local parentFrameName = parentFrame:GetName()
     local itemName = _G[parentFrameName.."TextLeft1"]:GetText()
     
-    -- Mining / Herbalism
     if(MINING_NODE_LEVEL[itemName]) then
         GatherLevels_SetMiningInfoOnLine(parentFrame, itemName)
     elseif(HERBALISM_NODE_LEVEL[itemName]) then
         GatherLevels_SetHerbalismInfoOnLine(parentFrame, itemName)
-    -- Lockboxes in inventory
     elseif(LOCKBOX_LEVEL[itemName]) then
         GatherLevels_SetLockpickingInfo(parentFrame, LOCKBOX_LEVEL[itemName])
     end
     
-    -- Dynamic Tooltip Scanning (For Skinning and World Objects like Doors/Chests)
     local isSkinnable = false
     local lockReq = nil
-
     for c = 1, GameTooltip:NumLines() do
         local lineText = _G["GameTooltipTextLeft"..c]:GetText()
         if lineText then
             if lineText == "Skinnable" then isSkinnable = true end
-            -- Look for "Lockpicking (150)" pattern in tooltips
             local _, _, level = string.find(lineText, "Lockpicking %((%d+)%)")
             if level then lockReq = tonumber(level) end
         end
@@ -95,7 +138,6 @@ end
 
 function GatherLevels_SetLockpickingInfo(frame, levelreq)
     local r, g, b, status = GatherLevels_GetDifficultyInfo(GatherLevels_GetProfessionLevel("Lockpicking"), levelreq)
-    -- If it's a world object (door/chest), we use AddLine so we don't overwrite the name
     frame:AddLine("Lockpicking ("..levelreq..") - "..status, r, g, b)
 end
 
@@ -104,9 +146,4 @@ function GatherLevels_AddSkinningInfo(frame)
     if(levelreq < 100) then levelreq = 1 end
     local r, g, b, status = GatherLevels_GetDifficultyInfo(GatherLevels_GetProfessionLevel("Skinning"), levelreq)
     frame:AddLine("Skinning ("..levelreq..") - "..status, r, g, b)
-end
-
-function GatherLevels_IsSkinnable()
-    -- This is now handled inside the OnShow loop for better performance
-    return false 
 end
