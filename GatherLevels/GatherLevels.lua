@@ -64,7 +64,6 @@ function GatherLevels_GetDifficultyInfo(playerSkill, reqSkill)
     end
 end
 
--- Slash Command Handler
 SLASH_GATHERLEVELS1 = "/gl"
 SlashCmdList["GATHERLEVELS"] = function(msg)
     if msg == "toggle" then
@@ -104,7 +103,6 @@ function GatherLevels_GetProfessionLevel(skill)
 end
 
 function GatherLevels_OnShow()
-    -- Check if addon is globally enabled
     if not GatherLevelsConfig.enabled then return end
 
     local parentFrame = this:GetParent()
@@ -121,12 +119,24 @@ function GatherLevels_OnShow()
     
     local isSkinnable = false
     local lockReq = nil
+
     for c = 1, GameTooltip:NumLines() do
-        local lineText = _G["GameTooltipTextLeft"..c]:GetText()
-        if lineText then
-            if lineText == "Skinnable" then isSkinnable = true end
-            local _, _, level = string.find(lineText, "Lockpicking %((%d+)%)")
-            if level then lockReq = tonumber(level) end
+        local line = _G["GameTooltipTextLeft"..c]
+        if line then
+            local lineText = line:GetText()
+            -- Handle Skinning Redundancy
+            if lineText == "Skinnable" then 
+                isSkinnable = true 
+                line:SetText("")
+            end
+            -- Handle Lockpicking Redundancy and Requirement Capture
+            local _, _, level = string.find(lineText or "", "Lockpicking %((%d+)%)")
+            if level then 
+                lockReq = tonumber(level)
+                line:SetText("") -- Hide the original requirement line
+            end
+            -- Optional: Hide the simple "Locked" line if you want it even cleaner
+            if lineText == "Locked" then line:SetText("") end
         end
     end
 
@@ -148,6 +158,7 @@ end
 
 function GatherLevels_SetLockpickingInfo(frame, levelreq)
     local r, g, b, status = GatherLevels_GetDifficultyInfo(GatherLevels_GetProfessionLevel("Lockpicking"), levelreq)
+    -- This adds the new line to world objects/boxes while original lines are hidden
     frame:AddLine("Lockpicking ("..levelreq..") - "..status, r, g, b)
 end
 
