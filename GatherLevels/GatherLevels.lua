@@ -1,6 +1,9 @@
 -- Initialize Config if it doesn't exist (Saved Variable)
 if not GatherLevelsConfig then
-    GatherLevelsConfig = { showLeftText = true }
+    GatherLevelsConfig = { 
+        showLeftText = true,
+        enabled = true 
+    }
 end
 
 MINING_NODE_LEVEL = {
@@ -35,12 +38,10 @@ LOCKBOX_LEVEL = {
     ["Sturdy Junkbox"] = 175, ["Heavy Junkbox"] = 250
 }
 
--- Centralized logic for difficulty colors and toggleable status
 function GatherLevels_GetDifficultyInfo(playerSkill, reqSkill)
     local r, g, b, status;
     local showExtra = GatherLevelsConfig.showLeftText
 
-    -- Hex Codes for text coloring
     local cGray   = "|cff808080Gray|r"
     local cGreen  = "|cff40bf40Green|r"
     local cYellow = "|cffffff00Yellow|r"
@@ -66,7 +67,11 @@ end
 -- Slash Command Handler
 SLASH_GATHERLEVELS1 = "/gl"
 SlashCmdList["GATHERLEVELS"] = function(msg)
-    if msg == "left" then
+    if msg == "toggle" then
+        GatherLevelsConfig.enabled = not GatherLevelsConfig.enabled
+        local state = GatherLevelsConfig.enabled and "|cff00ff00ON|r" or "|cffff0000OFF|r"
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00GatherLevels:|r Addon is now " .. state)
+    elseif msg == "left" then
         GatherLevelsConfig.showLeftText = not GatherLevelsConfig.showLeftText
         local state = GatherLevelsConfig.showLeftText and "|cff00ff00Enabled|r" or "|cffff0000Disabled|r"
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00GatherLevels:|r Skill points remaining text is now " .. state .. ".")
@@ -79,10 +84,12 @@ SlashCmdList["GATHERLEVELS"] = function(msg)
                 DEFAULT_CHAT_FRAME:AddMessage(" - " .. s .. ": |cff00ff00" .. rank .. "|r")
             end
         end
-        DEFAULT_CHAT_FRAME:AddMessage(" - Type |cFF00FF00/gl left|r to toggle threshold text.")
+        DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl toggle|r : Turn addon tooltips ON/OFF.")
+        DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl left|r : Toggle threshold text.")
     else
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00GatherLevels Commands:|r")
-        DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl skills|r : Shows your current gathering levels.")
+        DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl toggle|r : Enable/Disable addon tooltips.")
+        DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl skills|r : Show your current gathering levels.")
         DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl left|r : Toggles 'points until next color' text.")
     end
 end
@@ -97,6 +104,9 @@ function GatherLevels_GetProfessionLevel(skill)
 end
 
 function GatherLevels_OnShow()
+    -- Check if addon is globally enabled
+    if not GatherLevelsConfig.enabled then return end
+
     local parentFrame = this:GetParent()
     local parentFrameName = parentFrame:GetName()
     local itemName = _G[parentFrameName.."TextLeft1"]:GetText()
