@@ -38,6 +38,7 @@ LOCKBOX_LEVEL = {
     ["Sturdy Junkbox"] = 175, ["Heavy Junkbox"] = 250
 }
 
+-- Centralized logic for difficulty colors and toggleable status
 function GatherLevels_GetDifficultyInfo(playerSkill, reqSkill)
     local r, g, b, status;
     local showExtra = GatherLevelsConfig.showLeftText
@@ -48,22 +49,26 @@ function GatherLevels_GetDifficultyInfo(playerSkill, reqSkill)
     local cOrange = "|cffff8040Orange|r"
     local cRed    = "|cffff2121Too Low|r"
 
+    -- Too Low (Red) and Gray don't show "points to" text
     if playerSkill < reqSkill then
         return 1.00, 0.13, 0.13, cRed
     elseif playerSkill >= (reqSkill + 100) then
         return 0.50, 0.50, 0.50, cGray
     elseif playerSkill >= (reqSkill + 50) then
         status = showExtra and (((reqSkill + 100) - playerSkill) .. " to " .. cGray) or cGreen
-        return 0.25, 0.75, 0.25, status
     elseif playerSkill >= (reqSkill + 25) then
         status = showExtra and (((reqSkill + 50) - playerSkill) .. " to " .. cGreen) or cYellow
-        return 1.00, 1.00, 0.00, status
     else
         status = showExtra and (((reqSkill + 25) - playerSkill) .. " to " .. cYellow) or cOrange
-        return 1.00, 0.50, 0.25, status
     end
+
+    -- Return logic for Green, Yellow, and Orange brackets
+    if playerSkill >= (reqSkill + 50) then return 0.25, 0.75, 0.25, status
+    elseif playerSkill >= (reqSkill + 25) then return 1.00, 1.00, 0.00, status
+    else return 1.00, 0.50, 0.25, status end
 end
 
+-- Slash Command Handler
 SLASH_GATHERLEVELS1 = "/gl"
 SlashCmdList["GATHERLEVELS"] = function(msg)
     if msg == "toggle" then
@@ -83,13 +88,11 @@ SlashCmdList["GATHERLEVELS"] = function(msg)
                 DEFAULT_CHAT_FRAME:AddMessage(" - " .. s .. ": |cff00ff00" .. rank .. "|r")
             end
         end
-        DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl toggle|r : Turn addon tooltips ON/OFF.")
-        DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl left|r : Toggle threshold text.")
     else
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00GatherLevels Commands:|r")
         DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl toggle|r : Enable/Disable addon tooltips.")
         DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl skills|r : Show your current gathering levels.")
-        DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl left|r : Toggles 'points until next color' text.")
+        DEFAULT_CHAT_FRAME:AddMessage(" - |cFF00FF00/gl left|r : Toggles threshold text.")
     end
 end
 
@@ -124,18 +127,15 @@ function GatherLevels_OnShow()
         local line = _G["GameTooltipTextLeft"..c]
         if line then
             local lineText = line:GetText()
-            -- Handle Skinning Redundancy
             if lineText == "Skinnable" then 
                 isSkinnable = true 
                 line:SetText("")
             end
-            -- Handle Lockpicking Redundancy and Requirement Capture
             local _, _, level = string.find(lineText or "", "Lockpicking %((%d+)%)")
             if level then 
                 lockReq = tonumber(level)
-                line:SetText("") -- Hide the original requirement line
+                line:SetText("") 
             end
-            -- Optional: Hide the simple "Locked" line if you want it even cleaner
             if lineText == "Locked" then line:SetText("") end
         end
     end
@@ -158,7 +158,6 @@ end
 
 function GatherLevels_SetLockpickingInfo(frame, levelreq)
     local r, g, b, status = GatherLevels_GetDifficultyInfo(GatherLevels_GetProfessionLevel("Lockpicking"), levelreq)
-    -- This adds the new line to world objects/boxes while original lines are hidden
     frame:AddLine("Lockpicking ("..levelreq..") - "..status, r, g, b)
 end
 
